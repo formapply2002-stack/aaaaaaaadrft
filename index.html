@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Library Work Automate - Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      :root {
+        --bg-color: #0b0c10;
+        --gradient-start: #663399; /* Violet */
+        --gradient-end: #00bcd4; /* Cyan */
+        --glow-color: #ff2a6d; /* Deep Pink */
+        --text-color: #ffffff;
+        --input-bg: rgba(255, 255, 255, 0.05);
+        --secondary-bg: rgba(17, 18, 23, 0.9);
+        --attendance-summary-bg: #1e1e2d;
+        --detail-panel-bg: rgba(17, 18, 23, 0.95);
+        --login-bg: #1a1a2e;
+        --login-border: #4CAF50;
+        --login-glow: #00bcd4;
+        --modal-bg: #1e1e2d;
+        --modal-border: var(--glow-color);
+      }
+      
+      body {
+        font-family: 'Montserrat', sans-serif;
+        background-color: var(--bg-color);
+        overflow-x: hidden;
+      }
+
+      .animated-bg::before {
+        content: ''; position: fixed; top: 0; left: 0; width: 300%; height: 300%;
+        background: linear-gradient(45deg, var(--gradient-start) 0%, #3366ff 25%, var(--gradient-end) 50%, var(--glow-color) 75%, var(--gradient-start) 100%);
+        background-size: 200% 200%; opacity: 0.15; animation: gradientMove 30s infinite linear;
+        pointer-events: none;
+        z-index: -1;
+      }
+
+      @keyframes gradientMove { 0% { background-position: 0% 50%; } 100% { background-position: 100% 50%; } }
+      @keyframes subtleTilt { 0%, 100% { transform: perspective(1000px) rotateY(0deg) scale(1); } 50% { transform: perspective(1000px) rotateY(1deg) scale(1.01); } }
+      @keyframes colorShift { 0% { filter: hue-rotate(0deg); } 100% { filter: hue-rotate(360deg); } }
+
+      .tilt-animation { animation: subtleTilt 10s infinite ease-in-out; }
+      .color-shift-animation { animation: colorShift 5s infinite alternate; }
+
+      /* Scrollbar styling for table containers */
+      .custom-scrollbar::-webkit-scrollbar { height: 8px; width: 8px; }
+      .custom-scrollbar::-webkit-scrollbar-track { background: rgba(255, 255, 255, 0.1); }
+      .custom-scrollbar::-webkit-scrollbar-thumb { background: var(--gradient-end); border-radius: 4px; }
+
+      @media print {
+        body { background: white !important; color: black !important; }
+        .no-print, .action-buttons-footer, .back-btn, .print-btn, .dashboard-btn, .modal-overlay, form { display: none !important; }
+        .animated-bg::before { display: none !important; }
+        
+        #root, .main-panel, .main-panel-content {
+            width: 100% !important; max-width: none !important; margin: 0 !important; padding: 0 !important;
+            border: none !important; box-shadow: none !important; background: white !important;
+            position: static !important;
+        }
+
+        .data-table-container { max-height: none !important; overflow: visible !important; width: 100% !important; }
+        table { width: 100% !important; border-collapse: collapse !important; color: black !important; font-size: 11px; }
+        th, td { border: 1px solid black !important; padding: 5px !important; color: black !important; }
+      }
+
+      /* ==========================================================================
+         PDF EXPORT STYLES
+         These styles activate ONLY when the class .pdf-export is added to the 
+         container during PDF generation. They enforce A4-friendly colors and fonts.
+         ========================================================================== */
+      .pdf-export {
+        background-color: white !important;
+        color: black !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        width: 100% !important;
+        font-family: Arial, sans-serif !important;
+        /* Force a width that maps well to A4 landscape (approx 297mm) */
+        min-width: 1000px !important; 
+      }
+
+      .pdf-export h3 {
+        color: black !important;
+        text-align: left !important;
+        margin-bottom: 10px !important;
+        font-size: 16px !important; /* Smaller header */
+        font-weight: 900 !important;
+      }
+
+      .pdf-export .data-table-container {
+        max-height: none !important;
+        overflow: visible !important;
+        display: block !important;
+      }
+
+      .pdf-export table {
+        width: 100% !important;
+        border-collapse: collapse !important;
+        color: black !important;
+        background-color: white !important;
+        table-layout: auto !important;
+      }
+
+      .pdf-export th, .pdf-export td {
+        border: 1px solid #000 !important; /* Sharp black borders */
+        padding: 4px 3px !important; /* Very compact padding */
+        color: black !important;
+        font-size: 9px !important; /* Small font to fit many rows/cols */
+        vertical-align: middle !important;
+        line-height: 1.2 !important;
+      }
+
+      .pdf-export th {
+        font-weight: bold !important;
+        font-size: 10px !important;
+      }
+
+      /* Prevent Rows from cutting across pages */
+      .pdf-export tr {
+        page-break-inside: avoid !important;
+        page-break-after: auto !important;
+      }
+      .pdf-export thead {
+        display: table-header-group !important;
+      }
+
+      /* Force background printing */
+      .pdf-export * {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
+
+      /* --- Student Table Colors (Matches Airtable Screenshot) --- */
+      .pdf-export #studentTable thead th:nth-child(1) { background-color: #663399 !important; color: white !important; }
+      .pdf-export #studentTable thead th:nth-child(2) { background-color: #E91E63 !important; color: white !important; }
+      .pdf-export #studentTable thead th:nth-child(3) { background-color: #2196F3 !important; color: white !important; }
+      .pdf-export #studentTable thead th:nth-child(4) { background-color: #FFC107 !important; color: black !important; }
+      .pdf-export #studentTable thead th:nth-child(5) { background-color: #00BCD4 !important; color: black !important; }
+      .pdf-export #studentTable thead th:nth-child(6) { background-color: #3F51B5 !important; color: white !important; }
+      .pdf-export #studentTable thead th:nth-child(7) { background-color: #4CAF50 !important; color: white !important; }
+      .pdf-export #studentTable thead th:nth-child(8) { background-color: #F44336 !important; color: white !important; }
+
+      /* --- WOW Table Colors --- */
+      .pdf-export #wowTable thead th { color: white !important; }
+      .pdf-export #wowTable thead th:nth-child(1) { background-color: #663399 !important; } /* Seat */
+      .pdf-export #wowTable thead th:nth-child(2) { background-color: #E91E63 !important; } /* Name */
+      .pdf-export #wowTable thead th:nth-child(3) { background-color: #00BCD4 !important; color: black !important; } /* Father */
+      .pdf-export #wowTable thead th:nth-child(4) { background-color: #FFC107 !important; color: black !important; } /* Address */
+      .pdf-export #wowTable thead th:nth-child(5) { background-color: #00BCD4 !important; color: black !important; } /* Mobile */
+      .pdf-export #wowTable thead th:nth-child(6) { background-color: #FF5722 !important; } /* Batch */
+      .pdf-export #wowTable thead th:nth-child(7) { background-color: #009688 !important; } /* Shifts */
+      .pdf-export #wowTable thead th:nth-child(8) { background-color: #FFC107 !important; color: black !important; } /* Payment */
+
+      /* --- Seat Graph Colors --- */
+      .pdf-export .bg-\[\#d4edda\] { background-color: #d4edda !important; color: #155724 !important; }
+      .pdf-export .bg-\[\#f8d7da\] { background-color: #f8d7da !important; color: #721c24 !important; }
+      .pdf-export .booking-table th { background-color: #00BCD4 !important; color: black !important; }
+      .pdf-export .booking-table th:first-child { background-color: #663399 !important; color: white !important; }
+
+      /* --- Pay Details Colors --- */
+      .pdf-export #payDetailsTable thead th:nth-child(1) { background-color: #F44336 !important; color: white !important; }
+      .pdf-export #payDetailsTable thead th:nth-child(2) { background-color: #663399 !important; color: white !important; }
+      .pdf-export #payDetailsTable thead th:nth-child(3) { background-color: #E91E63 !important; color: white !important; }
+      .pdf-export #payDetailsTable thead th:nth-child(4) { background-color: #00BCD4 !important; color: black !important; }
+      .pdf-export #payDetailsTable thead th:nth-child(5) { background-color: #FFC107 !important; color: black !important; }
+      .pdf-export #payDetailsTable thead th:nth-child(6) { background-color: #00BCD4 !important; color: black !important; }
+      .pdf-export #payDetailsTable thead th:nth-child(7) { background-color: #e0e0e0 !important; color: black !important; }
+
+      /* --- Attendance Colors --- */
+      .pdf-export #attendanceTable thead tr:first-child th { background-color: #663399 !important; color: white !important; }
+      .pdf-export #attendanceTable thead tr:nth-child(2) th:nth-child(1) { background-color: #F44336 !important; color: white !important; }
+      .pdf-export #attendanceTable thead tr:nth-child(2) th:nth-child(2) { background-color: #3F51B5 !important; color: white !important; }
+      .pdf-export #attendanceTable thead tr:nth-child(2) th:nth-child(n+3) { background-color: #e0e0e0 !important; color: black !important; }
+
+      /* Hide Inputs in PDF */
+      .pdf-export input, .pdf-export textarea {
+        background: transparent !important;
+        border: none !important;
+        color: black !important;
+        text-align: center;
+        width: auto !important;
+        display: inline-block;
+        padding: 0 !important;
+        margin: 0 !important;
+        height: auto !important;
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react-dom/": "https://esm.sh/react-dom@^19.2.1/",
+    "react/": "https://esm.sh/react@^19.2.1/",
+    "react": "https://esm.sh/react@^19.2.1",
+    "html5-qrcode": "https://esm.sh/html5-qrcode@^2.3.8",
+    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.2",
+    "vite": "https://esm.sh/vite@^7.2.7"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+  <body class="animated-bg text-white min-h-screen">
+    <div id="root"></div>
+  <script type="module" src="/index.tsx"></script>
+</body>
+</html>
